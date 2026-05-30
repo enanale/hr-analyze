@@ -1,0 +1,36 @@
+# OS files
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+ENV/
+env/
+.pytest_cache/
+.mypy_cache/
+
+# Node/Vite
+**/node_modules/
+**/dist/
+**/dist-ssr/
+*.log
+npm-debug.log*
+
+# Personal Test Data / CSVs / Garmin FIT files (avoid committing real health logs)
+*.csv
+*.fit
+/Users/enanale/Desktop/h10_ecg.csv
+
+# IDE/Editor configs
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

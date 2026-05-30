@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+fitparse
+numpy
+pandas
+scipy
+python-multipart
+pydantic
