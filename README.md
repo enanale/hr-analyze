@@ -8,11 +8,11 @@ Built specifically to support recovery tracking and cardiac rehabilitation, this
 
 ## Previews
 
-![Dashboard Overview](assets/preview1.png)
+![Dashboard Overview](assets/dashboard_overview.png)
 
 *High-frequency ECG micro grid and interactive cardiac anomaly log.*
 
-![Telemetry Scrubbing](assets/preview2.png)
+![Telemetry Scrubbing](assets/ecg_waveform_analysis.png)
 
 *Draggable session macro timeline with heart rate profiles and pacing charts.*
 
