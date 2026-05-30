@@ -10,10 +10,10 @@ The user is a runner undergoing cardiac rehabilitation following a Left Anterior
   - Real-time standard Heart Rate (HR).
   - Beat-to-beat intervals (RR intervals / HRV data).
   - Raw ECG waveform data (sampled at 130Hz) when connected via Bluetooth to compatible software.
-- **Garmin Forerunner 245 (Optional):** Sport watch used to record outdoor runs/rehab sessions. It can capture GPS, pace, standard HR, and raw RR intervals (if "Log HRV" is enabled) from the paired Polar H10 chest strap, saving them in a binary `.fit` activity file.
+- **Garmin Smartwatch (Optional):** Sport watch (e.g., Forerunner series) used to record outdoor runs/rehab sessions. It can capture GPS, pace, standard HR, and raw RR intervals (if "Log HRV" is enabled) from the paired Polar H10 chest strap, saving them in a binary `.fit` activity file.
 
 ### 1.3 Objective
-To establish a pipeline that allows the user to download, visualize, and analyze their raw heart rate and raw ECG data from the Polar H10 chest strap, highlighting any cardiac irregularities. If a Garmin `.fit` activity file is optionally provided, the application will synchronize and overlay spatial and activity metrics (GPS, speed, altitude) onto the cardiac timeline.
+To establish a pipeline that allows the user to download, visualize, and analyze their raw heart rate and raw ECG data from the Polar H10 chest strap, highlighting any cardiac irregularities. If Garmin data is optionally provided, the application will synchronize and overlay spatial and activity metrics (GPS, speed, altitude) onto the cardiac timeline—either via manual `.fit` file upload or direct, automated cloud synchronization from Garmin Connect.
 
 ---
 
@@ -41,7 +41,7 @@ For many parts of this workflow, highly mature off-the-shelf software already ex
 While off-the-shelf tools exist, they are fragmented:
 - Kubios analyzes RR intervals but does not visualize the actual *raw ECG waveform* from ECGLogger.
 - Custom anomaly detection can flag specific voltage patterns in the 130Hz ECG signal (e.g., PVC detection).
-- A unified local web app will allow loading a Polar ECG CSV file as the primary source, visualizing it instantly, and optionally uploading a Garmin FIT file to sync and overlay running metrics (GPS, speed, elevation) on the timeline.
+- A unified local web app will allow loading a Polar ECG CSV file as the primary source, visualizing it instantly, and optionally uploading a Garmin FIT file or syncing directly with Garmin Connect to overlay running metrics (GPS, speed, elevation) on the timeline.
 
 ---
 
@@ -49,21 +49,23 @@ While off-the-shelf tools exist, they are fragmented:
 
 ### CUJ 1: Log & Export
 During a run or recovery session, the user runs **ECGLogger** on their phone to capture the raw 130Hz ECG stream from the Polar H10. Optionally, the user also records an activity on their Garmin watch (paired with Polar H10) to capture GPS/pace data.
-- **Result:** User obtains a Polar ECG `.csv` file (required) and optionally a Garmin `.fit` file.
+- **Result:** User obtains a Polar ECG `.csv` file (required) and optionally a Garmin `.fit` file (or registers it to their Garmin Connect account).
 
 ### CUJ 2: Flexible Import & Alignment
 The user opens the **HR-Analyze** app.
 - **Scenario A (ECG Only):** User uploads only the Polar `.csv` file. The app parses it and presents the full interactive ECG visualizer and anomaly dashboard.
-- **Scenario B (ECG + Garmin FIT):** User uploads both files. The application automatically extracts timestamps, cross-correlates the heart rate profiles to align the timelines, and syncs the Garmin activity metrics (speed/GPS) with the raw ECG timeline.
+- **Scenario B (ECG + Garmin FIT File):** User uploads both files. The application automatically extracts timestamps, cross-correlates the heart rate profiles to align the timelines, and syncs the Garmin activity metrics (speed/GPS) with the raw ECG timeline.
+- **Scenario C (ECG + Garmin Connect Cloud Sync):** User enters Garmin credentials (cached securely in local memory). The backend fetches the latest activity lists, downloads the selected `.fit` file in the background, extracts the telemetry, and aligns it with the uploaded Polar ECG CSV file automatically.
 
 ### CUJ 3: Multi-Scale Visualization
 The user sees an interactive dashboard:
-1. **Macro View (The Session):** Shows the full session heart rate profile (and speed/altitude if Garmin data is present).
+1. **Macro View (The Session):** Shows the full session heart rate profile (and speed/altitude if Garmin data is present) using an interactive, brushable SVG timeline.
 2. **Micro View (The Waveform):** An interactive standard ECG grid displaying the raw 130Hz electrical signal. Clicking anywhere on the Macro View scrolls the Micro View to the exact corresponding second.
 
 ### CUJ 4: Irregularity Detection Dashboard
 The application runs local digital signal processing on the 130Hz ECG signal to automatically flag anomalies:
 - Ectopic beats / PVCs (Premature Ventricular Contractions).
+- Ectopic beats / PACs (Premature Atrial Contractions).
 - Sudden artifact dropouts (sensor movement).
 - Unusually long pauses or tachycardic spikes.
 The user can jump to these flagged markers instantly with a single click.
@@ -75,20 +77,21 @@ The user can jump to these flagged markers instantly with a single click.
 | ID | Requirement | Priority |
 |---|---|---|
 | **F-01** | Support Polar H10 raw ECG `.csv` file import (timestamp, microvolt ECG readings). | P0 |
-| **F-02** | Support Garmin `.fit` file import (extracting timestamp, heart rate, and RR intervals). | P1 (Optional) |
+| **F-02** | Support Garmin `.fit` file import (extracting timestamp, heart rate, and RR intervals). | P1 |
 | **F-03** | Auto-align datasets using epoch timestamps and cross-correlation of heart rate profiles (when both FIT and CSV are provided). | P1 |
-| **F-04** | Fast rendering of the 130Hz ECG waveform (utilizing canvas/WebGL or highly optimized SVG). | P0 |
+| **F-04** | Fast rendering of the 130Hz ECG waveform (utilizing a custom high-performance HTML5 Canvas with hardware acceleration). | P0 |
 | **F-05** | Timeline scrubbing: clicking on the activity timeline updates the ECG waveform focus area. | P0 |
 | **F-06** | Basic irregularity algorithms: flag Premature Ventricular Contractions (PVCs) using QRS width analysis and RR interval outliers. | P1 |
 | **F-07** | Fully local-first execution to guarantee health privacy. | P0 |
+| **F-08** | Support automated direct cloud integration with Garmin Connect API to pull running activity FIT files on the fly. | P1 |
 
 ---
 
 ## 5. Non-Functional Requirements
 
-- **Performance:** ECG records contain ~468,000 points per hour. Visualization must render smoothly at 60 FPS without crashing the browser tab.
-- **Aesthetics:** Sleek dark-mode, premium typography (e.g., Inter), modern dashboard card layout with glassmorphic accents.
-- **Ease of Deployment:** Simple local run command (e.g., python backend + fast frontend or single-bundle web page).
+- **Performance:** ECG records contain ~468,000 points per hour. Visualization must render smoothly at 60 FPS without crashing the browser tab. Renders high-performance HTML5 canvas for the Micro view with dynamic scroll limits.
+- **Aesthetics:** Sleek warm off-white clinical light theme matching the new Google Health design app (background: `#f8f9fa`, cards: `#ffffff`, high-contrast typography in Google dark charcoal `#202124` and medium gray `#5f6368`), using premium typography, clean slate ECG grid lines (`#f1f3f4` / `#e2e8f0`), and clean solid Material Design 3 components.
+- **Ease of Deployment:** Simple local run command (`python backend + fast frontend`).
 
 ---
 
@@ -96,7 +99,7 @@ The user can jump to these flagged markers instantly with a single click.
 
 To ensure maximum usability, the application MUST include an interactive **Onboarding Wizard** that walks the user through setting up their devices. The onboarding flow will feature clear steps, visual checkpoints, and direct download links.
 
-### Step 1: Pair Polar H10 with Garmin Forerunner 245
+### Step 1: Pair Polar H10 with Garmin Watch
 - **Goal:** Ensure Garmin records heart rate and RR interval signals from the chest strap rather than the optical wrist sensor.
 - **Instruction to User:**
   1. Put on your Polar H10 chest strap (moisten the electrodes for best connectivity).
@@ -122,12 +125,13 @@ To ensure maximum usability, the application MUST include an interactive **Onboa
 
 ### Step 4: Exporting Data After a Session
 - **Goal:** Guide the user on how to retrieve the files.
-- **Garmin FIT File:**
+- **Garmin FIT File (Manual Option):**
   1. Go to [Garmin Connect Web](https://connect.garmin.com/).
   2. Open the recorded activity.
   3. Click the **Gear icon** in the top-right and select **Export Original** (this downloads a `.zip` containing the `.fit` file).
+- **Garmin Connect Cloud Sync (Automated Option):**
+  1. Enter your Garmin credentials directly in the "Garmin Connect Sync" control panel in the dashboard to automatically synchronize activities without downloading them manually.
 - **Polar ECG CSV File:**
   1. In the ECGLogger app, open your recorded log.
   2. Tap **Export** and choose **CSV Format**.
   3. Transfer the CSV to your computer (via AirDrop, email, or local sync folder).
-
