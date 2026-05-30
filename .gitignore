@@ -25,6 +25,10 @@ npm-debug.log*
 *.csv
 *.fit
 /Users/enanale/Desktop/h10_ecg.csv
+.env
+.env.local
+.env.*
+
 
 # IDE/Editor configs
 .vscode/

@@ -1,10 +1,17 @@
 import numpy as np
 import math
+import os
+from dotenv import load_dotenv
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional, List, Dict, Any, Tuple
 from app.parsers import parse_polar_csv, parse_garmin_fit
 from app.dsp import filter_ecg, detect_r_peaks, analyze_cardiac_irregularities, align_timelines
+from app.garmin_client import get_recent_activities, download_garmin_fit_file
+
+# Load environment variables from .env relative to this file with override enabled
+dotenv_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '.env')
+load_dotenv(dotenv_path=dotenv_path, override=True)
 
 app = FastAPI(title="HR-Analyze API", version="1.0.0")
 
@@ -62,7 +69,8 @@ def calculate_rolling_hr(timestamps: np.ndarray, r_peaks: np.ndarray) -> List[Di
 @app.post("/api/analyze")
 async def analyze_activity(
     ecg_file: UploadFile = File(...),
-    garmin_file: Optional[UploadFile] = File(None)
+    garmin_file: Optional[UploadFile] = File(None),
+    garmin_activity_id: Optional[str] = Form(None)
 ):
     try:
         # 1. Parse Polar ECG CSV
@@ -88,31 +96,51 @@ async def analyze_activity(
         has_garmin = False
         sync_offset_ms = 0.0
         
+        # Determine if we should parse direct uploaded FIT file OR download programmatically
+        garmin_bytes = None
         if garmin_file:
             garmin_bytes = await garmin_file.read()
-            if len(garmin_bytes) > 0:
-                try:
-                    garmin_data = parse_garmin_fit(garmin_bytes)
-                    has_garmin = garmin_data["has_hrv"] or len(garmin_data["records"]) > 0
+        elif garmin_activity_id and garmin_activity_id != "undefined" and garmin_activity_id != "null" and garmin_activity_id != "":
+            email = os.getenv("GARMIN_EMAIL")
+            password = os.getenv("GARMIN_PASSWORD")
+            
+            if not email or not password or email == "your_email@example.com":
+                raise HTTPException(
+                    status_code=400,
+                    detail="Garmin credentials not configured in backend/.env file."
+                )
+            
+            try:
+                garmin_bytes = download_garmin_fit_file(email, password, garmin_activity_id)
+            except Exception as e:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Failed to download activity {garmin_activity_id} from Garmin Connect: {str(e)}"
+                )
+                
+        if garmin_bytes and len(garmin_bytes) > 0:
+            try:
+                garmin_data = parse_garmin_fit(garmin_bytes)
+                has_garmin = garmin_data["has_hrv"] or len(garmin_data["records"]) > 0
+                
+                if has_garmin and len(r_peaks) > 10:
+                    # Synchronize watch and chest strap timelines
+                    sync_offset_ms = align_timelines(
+                        garmin_data["records"], 
+                        timestamps, 
+                        r_peaks, 
+                        fs
+                    )
+                    # Shift ECG timestamps to align with Garmin watch clock
+                    timestamps = timestamps + sync_offset_ms
                     
-                    if has_garmin and len(r_peaks) > 10:
-                        # Synchronize watch and chest strap timelines
-                        sync_offset_ms = align_timelines(
-                            garmin_data["records"], 
-                            timestamps, 
-                            r_peaks, 
-                            fs
-                        )
-                        # Shift ECG timestamps to align with Garmin watch clock
-                        timestamps = timestamps + sync_offset_ms
-                        
-                        # Shift anomaly timestamps too
-                        for a in anomalies:
-                            a["timestamp"] += sync_offset_ms
-                except Exception as e:
-                    # Don't fail the whole request if optional Garmin parsing errors out
-                    print(f"Error parsing optional Garmin FIT: {e}")
-                    has_garmin = False
+                    # Shift anomaly timestamps too
+                    for a in anomalies:
+                        a["timestamp"] += sync_offset_ms
+            except Exception as e:
+                # Don't fail the whole request if optional Garmin parsing errors out
+                print(f"Error parsing optional Garmin FIT: {e}")
+                has_garmin = False
         
         # 5. Prepare visual outputs
         # To avoid massive payloads, we provide a downsampled view of the raw ECG line
@@ -329,3 +357,51 @@ async def get_demo_data():
         "garmin_activity": garmin_records,
         "ecg_heart_rate": ecg_hr_curve
     }
+
+
+@app.get("/api/garmin/config")
+async def get_garmin_config_status():
+    """
+    Checks if Garmin Connect credentials are set in the environment.
+    Used by the UI to highlight whether auto-sync is ready.
+    """
+    email = os.getenv("GARMIN_EMAIL")
+    password = os.getenv("GARMIN_PASSWORD")
+    
+    is_configured = (
+        bool(email) and 
+        bool(password) and 
+        email != "your_email@example.com"
+    )
+    
+    return {
+        "is_configured": is_configured,
+        "configured_email": email if is_configured else None
+    }
+
+
+@app.get("/api/garmin/activities")
+async def list_recent_garmin_activities():
+    """
+    Downloads and logs the list of recent workouts from Garmin Connect.
+    """
+    email = os.getenv("GARMIN_EMAIL")
+    password = os.getenv("GARMIN_PASSWORD")
+    
+    if not email or not password or email == "your_email@example.com":
+        raise HTTPException(
+            status_code=400,
+            detail="Garmin Connect credentials are not configured in backend/.env file."
+        )
+        
+    try:
+        activities = get_recent_activities(email, password, limit=10)
+        return {
+            "success": True,
+            "activities": activities
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Failed to connect or fetch activities from Garmin: {str(e)}"
+        )

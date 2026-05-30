@@ -1,28 +1,28 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 
 :root {
-  --bg-deep: #06080b;
-  --bg-card: rgba(14, 18, 25, 0.65);
-  --bg-card-hover: rgba(22, 28, 38, 0.8);
-  --border: rgba(255, 255, 255, 0.06);
-  --border-hover: rgba(255, 255, 255, 0.12);
+  --bg-deep: #f8f9fa;             /* Google warm off-white */
+  --bg-card: #ffffff;             /* M3 elevated white cards */
+  --bg-card-hover: #ffffff;
+  --border: rgba(0, 0, 0, 0.05);   /* Soft subtle outline */
+  --border-hover: rgba(0, 0, 0, 0.1);
   
-  --text-primary: #f3f4f6;
-  --text-secondary: #9ca3af;
-  --text-muted: #4b5563;
+  --text-primary: #202124;        /* Google dark charcoal */
+  --text-secondary: #5f6368;      /* Google medium grey */
+  --text-muted: #80868b;
   
-  --accent-cyan: #00f2fe;
-  --accent-blue: #4facfe;
-  --accent-coral: #ff5e62;
-  --accent-emerald: #10b981;
-  --accent-yellow: #f59e0b;
+  --accent-cyan: #1a73e8;         /* Google Blue */
+  --accent-blue: #1557b0;         /* Deeper Google Blue */
+  --accent-coral: #d93025;        /* Muted Google Red/Coral */
+  --accent-emerald: #137333;      /* Muted Google Green */
+  --accent-yellow: #e37400;       /* Google Amber */
   
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-display: 'Outfit', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
   font-family: var(--font-sans);
-  color-scheme: dark;
+  color-scheme: light;
   color: var(--text-primary);
   background: var(--bg-deep);
   -webkit-font-smoothing: antialiased;
@@ -49,14 +49,14 @@ body {
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.3);
+  background: #f1f3f4;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
+  background: #dadce0;
   border-radius: 99px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 242, 254, 0.35);
+  background: var(--accent-cyan);
 }
 
 /* ==========================================
@@ -68,8 +68,8 @@ body {
 }
 
 @keyframes pulse-cyan {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(0, 242, 254, 0.35); border-color: rgba(0, 242, 254, 0.15); }
-  50% { box-shadow: 0 0 16px 2px rgba(0, 242, 254, 0.15); border-color: rgba(0, 242, 254, 0.35); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(26, 115, 232, 0.2); border-color: rgba(26, 115, 232, 0.15); }
+  50% { box-shadow: 0 0 16px 2px rgba(26, 115, 232, 0.15); border-color: rgba(26, 115, 232, 0.35); }
 }
 
 @keyframes ping {
@@ -123,21 +123,19 @@ body {
 }
 .w-full { width: 100%; }
 
-/* Glassmorphism Cards */
+/* Material 3 Soft Elevated Cards */
 .glass-card {
   background: var(--bg-card);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
   border: 1px solid var(--border);
-  border-radius: 18px;
-  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.5);
-  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  border-radius: 24px;
+  box-shadow: 0 1px 3px 0 rgba(60, 64, 67, 0.1), 0 1px 2px 0 rgba(60, 64, 67, 0.06);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .glass-card:hover {
   border-color: var(--border-hover);
-  background: var(--bg-card-hover);
-  box-shadow: 0 16px 48px -8px rgba(0, 0, 0, 0.65);
+  background: var(--bg-card);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
 }
 
 .pulse-border-cyan {
@@ -146,7 +144,8 @@ body {
 
 /* Header glass effect */
 .bg-\[\#0c0e14\]\/75 {
-  background-color: rgba(10, 12, 18, 0.75);
+  background-color: rgba(255, 255, 255, 0.9);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
 }
 .backdrop-blur-md {
   backdrop-filter: blur(16px);
@@ -268,9 +267,9 @@ h1, h2, h3, h4, h5, h6 {
 .font-display { font-family: var(--font-display); }
 
 .text-secondary { color: var(--text-secondary); }
-.text-white { color: #ffffff; }
+.text-white { color: var(--text-primary); }
 .text-cyan-400 { color: var(--accent-cyan); }
-.text-cyan-300 { color: #67e8f9; }
+.text-cyan-300 { color: var(--accent-cyan); }
 .text-emerald-400 { color: var(--accent-emerald); }
 .text-red-400 { color: var(--accent-coral); }
 .text-right { text-align: right; }
@@ -279,19 +278,21 @@ h1, h2, h3, h4, h5, h6 {
 .tracking-wider { letter-spacing: 0.08em; }
 .leading-relaxed { line-height: 1.625; }
 
-/* Text Gradients */
+/* Text Gradients -> Clean solid colors */
 .text-gradient {
-  background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  background: none;
+  -webkit-background-clip: unset;
+  -webkit-text-fill-color: unset;
+  background-clip: unset;
+  color: var(--accent-cyan);
 }
 
 .text-gradient-coral {
-  background: linear-gradient(135deg, #ff5e62, #ff9966);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  background: none;
+  -webkit-background-clip: unset;
+  -webkit-text-fill-color: unset;
+  background-clip: unset;
+  color: var(--accent-coral);
 }
 
 /* ==========================================
@@ -308,32 +309,34 @@ h1, h2, h3, h4, h5, h6 {
 .border-dashed { border-style: dashed; }
 .border-b { border-bottom: 1px solid var(--border); }
 .border-x-2 { border-left-width: 2px; border-right-width: 2px; }
-.border-white\/5 { border-color: rgba(255, 255, 255, 0.05); }
-.border-white\/10 { border-color: rgba(255, 255, 255, 0.1); }
+.border-white\/5 { border-color: rgba(0, 0, 0, 0.05); }
+.border-white\/10 { border-color: rgba(0, 0, 0, 0.1); }
 .border-cyan-400 { border-color: var(--accent-cyan); }
-.border-red-500\/10 { border-color: rgba(255, 94, 98, 0.1); }
-.border-red-500\/20 { border-color: rgba(255, 94, 98, 0.2); }
-.border-emerald-500\/15 { border-color: rgba(16, 185, 129, 0.15); }
-.border-emerald-500\/20 { border-color: rgba(16, 185, 129, 0.2); }
+.border-red-500\/10 { border-color: rgba(217, 48, 37, 0.1); }
+.border-red-500\/20 { border-color: rgba(217, 48, 37, 0.2); }
+.border-emerald-500\/15 { border-color: rgba(19, 115, 51, 0.15); }
+.border-emerald-500\/20 { border-color: rgba(19, 115, 51, 0.2); }
 
 /* Dividers & Lists */
 .divide-y > * + * {
-  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 /* Background Opacities */
-.bg-cyan-500\/10 { background-color: rgba(0, 242, 254, 0.08); }
-.bg-cyan-400\/\[0\.04\] { background-color: rgba(0, 242, 254, 0.04); }
-.bg-white\/5 { background-color: rgba(255, 255, 255, 0.04); }
-.bg-white\/\[0\.01\] { background-color: rgba(255, 255, 255, 0.01); }
-.bg-white\/\[0\.02\] { background-color: rgba(255, 255, 255, 0.02); }
-.bg-emerald-500\/10 { background-color: rgba(16, 185, 129, 0.08); }
-.bg-emerald-500\/\[0\.01\] { background-color: rgba(16, 185, 129, 0.01); }
-.bg-emerald-500\/5 { background-color: rgba(16, 185, 129, 0.04); }
-.bg-red-500\/10 { background-color: rgba(255, 94, 98, 0.08); }
-.bg-\[\#0e1116\] { background-color: #0c0e13; }
-.bg-\[\#0e1116\]\/80 { background-color: rgba(12, 14, 19, 0.8); }
-.bg-\[\#0a0d14\] { background-color: #07080b; }
+.bg-cyan-500\/10 { background-color: rgba(26, 115, 232, 0.08); }
+.bg-cyan-400\/\[0\.04\] { background-color: rgba(26, 115, 232, 0.04); }
+.bg-white\/5 { background-color: rgba(0, 0, 0, 0.04); }
+.bg-white\/\[0\.01\] { background-color: rgba(0, 0, 0, 0.01); }
+.bg-white\/\[0\.02\] { background-color: rgba(0, 0, 0, 0.02); }
+.bg-emerald-500\/10 { background-color: rgba(19, 115, 51, 0.08); }
+.bg-emerald-500\/\[0\.01\] { background-color: rgba(19, 115, 51, 0.01); }
+.bg-emerald-500\/5 { background-color: rgba(19, 115, 51, 0.04); }
+.bg-red-500\/10 { background-color: rgba(217, 48, 37, 0.08); }
+.bg-\[\#0e1116\] { background-color: #f1f3f4; }
+.bg-\[\#0e1116\]\/80 { background-color: rgba(241, 243, 244, 0.8); }
+.bg-\[\#0a0d14\] { background-color: #ffffff; }
+.bg-\[\#07090d\] { background-color: #f8f9fa; }
+.bg-\[\#07090c\] { background-color: #f8f9fa; }
 
 /* ==========================================
    BUTTONS & DRAG-DROP ZONES
@@ -346,19 +349,22 @@ button {
   outline: none;
 }
 
-/* Premium Primary Neon Button */
+/* Premium Primary Solid Blue Pill Button */
 .bg-gradient-to-r {
-  background-image: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+  background-image: none !important;
+  background-color: var(--accent-cyan) !important;
   border: none;
-  color: #040608 !important;
-  box-shadow: 0 4px 20px -4px rgba(0, 242, 254, 0.4);
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  color: #ffffff !important;
+  box-shadow: 0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  border-radius: 100px !important;
 }
 
 .bg-gradient-to-r:hover:not(:disabled) {
   opacity: 1;
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px -2px rgba(0, 242, 254, 0.6);
+  background-color: var(--accent-blue) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 1px 3px 0 rgba(60,64,67,0.3), 0 4px 8px 3px rgba(60,64,67,0.15);
 }
 
 .bg-gradient-to-r:active:not(:disabled) {
@@ -367,17 +373,18 @@ button {
 
 /* Drag zones */
 .border-dashed {
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  border-color: rgba(0, 0, 0, 0.1) !important;
 }
 
 .border-dashed:hover {
-  background-color: rgba(255, 255, 255, 0.02);
-  border-color: rgba(255, 255, 255, 0.15) !important;
+  background-color: rgba(0, 0, 0, 0.015);
+  border-color: rgba(0, 0, 0, 0.2) !important;
 }
 
 .border-cyan-400 {
   border-color: var(--accent-cyan) !important;
-  box-shadow: 0 0 20px -4px rgba(0, 242, 254, 0.15);
+  box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.1);
 }
 
 /* ==========================================
@@ -418,12 +425,11 @@ button {
 /* Stepper connection lines */
 .bg-emerald-500\/50 {
   background-color: var(--accent-emerald);
-  box-shadow: 0 0 10px var(--accent-emerald);
 }
 
 /* Dashboard List Items */
 .bg-white\/\[0\.02\]:hover {
-  background-color: rgba(255, 255, 255, 0.035) !important;
+  background-color: rgba(0, 0, 0, 0.015) !important;
 }
 
 /* Metric glow overlay */

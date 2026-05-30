@@ -58,7 +58,7 @@ export const EcgCanvas: React.FC<EcgCanvasProps> = ({
     const height = rect.height;
 
     // Clear background
-    ctx.fillStyle = '#0a0d14';
+    ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, width, height);
 
     // Calculate time bounds of the current frame
@@ -81,14 +81,14 @@ export const EcgCanvas: React.FC<EcgCanvasProps> = ({
       return centerY - (valUv * verticalScale);
     };
     // ==========================================
-    // DRAW STANDARD MEDICAL ECG GRID LINES
+    // DRAW NEUTRAL STANDARD ECG GRID LINES
     // ==========================================
     // On standard ECG paper:
     // Minor grid lines (1mm): 0.04s (40ms) wide, 0.1mV (100uV) high.
     // Major grid lines (5mm): 0.20s (200ms) wide, 0.5mV (500uV) high.
     
-    const ecgRedGrid = 'rgba(255, 94, 98, 0.05)';
-    const ecgRedGridMajor = 'rgba(255, 94, 98, 0.18)';
+    const ecgGridMinor = '#f1f3f4';
+    const ecgGridMajor = '#e2e8f0';
 
     // 1. Draw Vertical Time Grid Lines (40ms and 200ms)
     // Find first minor grid line timestamp aligned to 40ms
@@ -98,7 +98,7 @@ export const EcgCanvas: React.FC<EcgCanvasProps> = ({
     for (let tGrid = firstGridMs; tGrid <= tEnd; tGrid += gridSpacingMs) {
       const isMajor = Math.round(tGrid) % 200 === 0;
       ctx.lineWidth = isMajor ? 1.0 : 0.5;
-      ctx.strokeStyle = isMajor ? ecgRedGridMajor : ecgRedGrid;
+      ctx.strokeStyle = isMajor ? ecgGridMajor : ecgGridMinor;
       
       const gx = getX(tGrid);
       ctx.beginPath();
@@ -116,7 +116,7 @@ export const EcgCanvas: React.FC<EcgCanvasProps> = ({
     for (let uGrid = uvMin; uGrid <= uvMax; uGrid += gridSpacingUv) {
       const isMajor = Math.round(uGrid) % 500 === 0;
       ctx.lineWidth = isMajor ? 1.0 : 0.5;
-      ctx.strokeStyle = isMajor ? ecgRedGridMajor : ecgRedGrid;
+      ctx.strokeStyle = isMajor ? ecgGridMajor : ecgGridMinor;
       
       const gy = getY(uGrid);
       ctx.beginPath();
@@ -167,7 +167,7 @@ export const EcgCanvas: React.FC<EcgCanvasProps> = ({
       ctx.beginPath();
       ctx.lineWidth = 2.0;
       ctx.lineJoin = 'round';
-      ctx.strokeStyle = '#00f2fe'; // Gorgeous Neon Cyan
+      ctx.strokeStyle = '#1a73e8'; // Clean Google Blue
       
       let isFirst = true;
       for (let i = startIdx; i <= endIdx; i++) {
@@ -198,15 +198,15 @@ export const EcgCanvas: React.FC<EcgCanvasProps> = ({
         // Draw electrical highlight circle
         ctx.beginPath();
         ctx.arc(ax, ay, 10, 0, 2 * Math.PI);
-        ctx.fillStyle = 'rgba(255, 94, 98, 0.25)'; // Translucent Electric Coral
+        ctx.fillStyle = 'rgba(217, 48, 37, 0.12)'; 
         ctx.fill();
-        ctx.strokeStyle = '#ff5e62';
+        ctx.strokeStyle = '#d93025';
         ctx.lineWidth = 1.5;
         ctx.stroke();
 
-        // Label annotation box
-        ctx.fillStyle = 'rgba(26, 31, 40, 0.95)';
-        ctx.strokeStyle = 'rgba(255, 94, 98, 0.4)';
+        // Label annotation box (clinical M3 capsule)
+        ctx.fillStyle = '#fce8e6';
+        ctx.strokeStyle = '#d93025';
         ctx.lineWidth = 1.0;
         ctx.font = '9px "JetBrains Mono", monospace';
         
@@ -214,17 +214,19 @@ export const EcgCanvas: React.FC<EcgCanvasProps> = ({
         const labelWidth = ctx.measureText(labelText).width + 12;
         
         // Render bubble above the peak
-        ctx.fillRect(ax - labelWidth / 2, ay - 32, labelWidth, 16);
-        ctx.strokeRect(ax - labelWidth / 2, ay - 32, labelWidth, 16);
+        ctx.beginPath();
+        ctx.roundRect(ax - labelWidth / 2, ay - 32, labelWidth, 16, 4);
+        ctx.fill();
+        ctx.stroke();
         
-        ctx.fillStyle = '#ff5e62';
+        ctx.fillStyle = '#d93025';
         ctx.fillText(labelText, ax - labelWidth / 2 + 6, ay - 20);
         
         // Draw downward connecting dash
         ctx.beginPath();
         ctx.moveTo(ax, ay - 16);
         ctx.lineTo(ax, ay - 10);
-        ctx.strokeStyle = '#ff5e62';
+        ctx.strokeStyle = '#d93025';
         ctx.stroke();
       }
     });
@@ -238,7 +240,7 @@ export const EcgCanvas: React.FC<EcgCanvasProps> = ({
       
       // Draw crosshair lines
       ctx.lineWidth = 0.5;
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.15)';
       ctx.setLineDash([4, 4]);
       
       ctx.beginPath();
@@ -259,26 +261,28 @@ export const EcgCanvas: React.FC<EcgCanvasProps> = ({
       const tpx = hx + 12 + tw > width ? hx - 12 - tw : hx + 12;
       const tpy = hy - 12 < 0 ? hy + 12 : hy - 12;
 
-      ctx.fillStyle = 'rgba(18, 22, 28, 0.9)';
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
       ctx.lineWidth = 1.0;
-      ctx.fillRect(tpx, tpy - 8, tw, 20);
-      ctx.strokeRect(tpx, tpy - 8, tw, 20);
+      ctx.beginPath();
+      ctx.roundRect(tpx, tpy - 8, tw, 20, 4);
+      ctx.fill();
+      ctx.stroke();
 
-      ctx.fillStyle = '#f3f4f6';
+      ctx.fillStyle = '#202124';
       ctx.fillText(tooltipText, tpx + 6, tpy + 5);
     }
 
     // Draw central alignment line
     ctx.lineWidth = 1.0;
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
     ctx.beginPath();
     ctx.moveTo(width / 2.0, 0);
     ctx.lineTo(width / 2.0, height);
     ctx.stroke();
 
     // Center focal label
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
     ctx.font = '9px "Inter", sans-serif';
     ctx.fillText("CENTER FOCUS", width / 2.0 - 32, 12);
 
@@ -335,7 +339,7 @@ export const EcgCanvas: React.FC<EcgCanvasProps> = ({
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
         <div>
           <h3 className="text-lg font-bold font-display text-white flex items-center gap-2 m-0">
-            <Zap size={16} className="text-[#00f2fe]" />
+            <Zap size={16} className="text-[#1a73e8]" />
             ECG Waveform Micro View
           </h3>
           <p className="text-xs text-secondary mt-0.5">
@@ -388,7 +392,7 @@ export const EcgCanvas: React.FC<EcgCanvasProps> = ({
       </div>
 
       {/* HTML5 Canvas Render Port */}
-      <div className="relative border border-white/5 rounded-xl overflow-hidden shadow-inner bg-[#0a0d14]">
+      <div className="relative border border-white/5 rounded-xl overflow-hidden shadow-inner bg-[#ffffff]">
         <canvas
           ref={canvasRef}
           onMouseDown={handleMouseDown}

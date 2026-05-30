@@ -6,3 +6,5 @@ pandas
 scipy
 python-multipart
 pydantic
+garminconnect
+

@@ -112,7 +112,7 @@ export const MacroTimeline: React.FC<MacroTimelineProps> = ({
     <div className="glass-card p-5 mb-8">
       <div className="flex justify-between items-center mb-3">
         <h3 className="text-sm font-bold font-mono tracking-wider text-secondary flex items-center gap-2 m-0">
-          <Activity size={15} className="text-[#00f2fe]" />
+          <Activity size={15} className="text-[#1a73e8]" />
           SESSION MACRO TIMELINE
         </h3>
         <span className="text-[10px] font-mono text-secondary flex items-center gap-1 bg-white/5 border border-white/5 px-2 py-0.5 rounded">
@@ -125,7 +125,7 @@ export const MacroTimeline: React.FC<MacroTimelineProps> = ({
       <div 
         ref={containerRef}
         onClick={handleTimelineClick}
-        className="relative h-28 bg-[#07090d] border border-white/5 rounded-xl overflow-hidden cursor-pointer select-none group"
+        className="relative h-28 bg-[#f8f9fa] border border-white/5 rounded-xl overflow-hidden cursor-pointer select-none group"
       >
         {/* SVG Visualization Layer with absolute viewBox */}
         <svg 
@@ -134,47 +134,35 @@ export const MacroTimeline: React.FC<MacroTimelineProps> = ({
           className="absolute inset-0 w-full h-full pointer-events-none"
         >
           {/* A. Reference Grid Mesh Lines (BPM 80, 120, 160) */}
-          <line x1={0} y1={getHrY(80)} x2={1000} y2={getHrY(80)} stroke="rgba(255, 255, 255, 0.03)" strokeWidth={1} strokeDasharray="5 5" />
-          <line x1={0} y1={getHrY(120)} x2={1000} y2={getHrY(120)} stroke="rgba(255, 255, 255, 0.03)" strokeWidth={1} strokeDasharray="5 5" />
-          <line x1={0} y1={getHrY(160)} x2={1000} y2={getHrY(160)} stroke="rgba(255, 255, 255, 0.03)" strokeWidth={1} strokeDasharray="5 5" />
+          <line x1={0} y1={getHrY(80)} x2={1000} y2={getHrY(80)} stroke="rgba(0, 0, 0, 0.06)" strokeWidth={1} strokeDasharray="5 5" />
+          <line x1={0} y1={getHrY(120)} x2={1000} y2={getHrY(120)} stroke="rgba(0, 0, 0, 0.06)" strokeWidth={1} strokeDasharray="5 5" />
+          <line x1={0} y1={getHrY(160)} x2={1000} y2={getHrY(160)} stroke="rgba(0, 0, 0, 0.06)" strokeWidth={1} strokeDasharray="5 5" />
           
-          <text x={4} y={getHrY(80) - 2} fill="rgba(255, 255, 255, 0.15)" fontSize="6" fontFamily="var(--font-mono)">80 bpm</text>
-          <text x={4} y={getHrY(120) - 2} fill="rgba(255, 255, 255, 0.15)" fontSize="6" fontFamily="var(--font-mono)">120 bpm</text>
-          <text x={4} y={getHrY(160) - 2} fill="rgba(255, 255, 255, 0.15)" fontSize="6" fontFamily="var(--font-mono)">160 bpm</text>
+          <text x={4} y={getHrY(80) - 2} fill="rgba(0, 0, 0, 0.35)" fontSize="6" fontFamily="var(--font-mono)">80 bpm</text>
+          <text x={4} y={getHrY(120) - 2} fill="rgba(0, 0, 0, 0.35)" fontSize="6" fontFamily="var(--font-mono)">120 bpm</text>
+          <text x={4} y={getHrY(160) - 2} fill="rgba(0, 0, 0, 0.35)" fontSize="6" fontFamily="var(--font-mono)">160 bpm</text>
 
           {/* B. Speed Trend Line (If Garmin speed data is present) */}
           {speedPoints && speedPoints.length > 1 && (
             <path
               d={buildSvgPath(speedPoints)}
               fill="none"
-              stroke="rgba(16, 185, 129, 0.18)"
+              stroke="rgba(19, 115, 51, 0.28)"
               strokeWidth={1.5}
               strokeDasharray="4 4"
             />
           )}
 
-          {/* C. Heart Rate Glowing Trend Line */}
+          {/* C. Heart Rate Clean Trend Line */}
           {hrPoints.length > 1 && (
-            <>
-              {/* Outer soft glow blur */}
-              <path
-                d={buildSvgPath(hrPoints)}
-                fill="none"
-                stroke="rgba(0, 242, 254, 0.12)"
-                strokeWidth={5}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              {/* Inner glowing core line */}
-              <path
-                d={buildSvgPath(hrPoints)}
-                fill="none"
-                stroke="#00f2fe"
-                strokeWidth={1.8}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </>
+            <path
+              d={buildSvgPath(hrPoints)}
+              fill="none"
+              stroke="#1a73e8"
+              strokeWidth={2.0}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           )}
 
           {/* D. Vertical Arrhythmia Warning Lines & Badges */}
@@ -189,19 +177,18 @@ export const MacroTimeline: React.FC<MacroTimelineProps> = ({
                   y1={0}
                   x2={ax}
                   y2={100}
-                  stroke="#ff5e62"
+                  stroke="#d93025"
                   strokeWidth={1}
                   strokeDasharray="3 3"
                   opacity={0.7}
                 />
                 
-                {/* Glowing alert dot */}
+                {/* Soft M3 indicator dot */}
                 <circle
                   cx={ax}
                   cy={35}
                   r={3.5}
-                  fill="#ff5e62"
-                  filter="drop-shadow(0px 0px 4px #ff5e62)"
+                  fill="#d93025"
                 />
                 
                 {/* Text tag badge at top */}
@@ -211,14 +198,14 @@ export const MacroTimeline: React.FC<MacroTimelineProps> = ({
                   width={36}
                   height={11}
                   rx={2}
-                  fill="rgba(11, 13, 18, 0.9)"
-                  stroke="rgba(255, 94, 98, 0.35)"
+                  fill="#fce8e6"
+                  stroke="#d93025"
                   strokeWidth={0.5}
                 />
                 <text
                   x={ax}
                   y={12}
-                  fill="#ff5e62"
+                  fill="#d93025"
                   fontSize="5.5"
                   fontWeight="bold"
                   fontFamily="var(--font-display)"
@@ -233,7 +220,7 @@ export const MacroTimeline: React.FC<MacroTimelineProps> = ({
 
         {/* E. Focused Scrubber Slider Overlay */}
         <div 
-          className="absolute h-full border-x border-[#00f2fe] bg-cyan-500/[0.03] transform -translate-x-1/2 pointer-events-none transition-all duration-75 shadow-[0_0_20px_rgba(0,242,254,0.1)]"
+          className="absolute h-full border-x border-[#1a73e8] bg-cyan-500/[0.04] transform -translate-x-1/2 pointer-events-none transition-all duration-75"
           style={{
             left: `${getPercentage(focusedTimestamp)}%`,
             width: '5.5%' // Fits standard viewing width
@@ -246,15 +233,15 @@ export const MacroTimeline: React.FC<MacroTimelineProps> = ({
         <span>00:00</span>
         <div className="flex gap-4">
           <span className="flex items-center gap-1.5">
-            <span className="w-2.5 h-0.5 bg-[#00f2fe]" /> Heart Rate Curve (BPM)
+            <span className="w-2.5 h-0.5 bg-[#1a73e8]" /> Heart Rate Curve (BPM)
           </span>
           {speedPoints && (
             <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-0.5 border-t border-dashed border-emerald-500/50" /> Running Speed (km/h)
+              <span className="w-2.5 h-0.5 border-t border-dashed border-[#137333]" /> Running Speed (km/h)
             </span>
           )}
           <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 bg-[#ff5e62] rounded-full shadow-[0_0_4px_#ff5e62]" /> Flagged Irregularity
+            <span className="w-2 h-2 bg-[#d93025] rounded-full" /> Flagged Irregularity
           </span>
         </div>
         <span>{formatTime(totalDurationMs)}</span>
