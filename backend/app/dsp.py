@@ -36,7 +36,7 @@ def detect_r_peaks(filtered_ecg: np.ndarray, fs: float) -> np.ndarray:
     
     # 4. Find peaks on integrated signal
     min_dist = int(0.3 * fs)  # Max heart rate ~200 BPM
-    threshold = np.percentile(integrated, 70) * 1.5  # Dynamic thresholding
+    threshold = np.percentile(integrated, 65) * 1.25  # Dynamic thresholding (robust against breathing axis shifts)
     
     peaks_int, _ = find_peaks(integrated, distance=min_dist, height=threshold)
     
@@ -108,43 +108,63 @@ def analyze_cardiac_irregularities(
         start_idx = max(0, i - rolling_len)
         local_avg_rr = np.median(rr_intervals[start_idx:i])
         
-        # 1. Anomaly: Premature Beat (RR interval shortened by > 20%)
-        if curr_rr < 0.80 * local_avg_rr:
-            # Check for compensatory pause (next RR interval is lengthened)
+        # 1. Anomaly: Premature Beat (RR interval shortened by > 18%)
+        # To completely filter out sinus arrhythmia / heart rate accelerations, we enforce a post-ectopic pause check:
+        # the next beat's RR interval must be significantly longer (>15%) than the premature interval.
+        if curr_rr < 0.82 * local_avg_rr:
             next_rr = rr_intervals[i+1]
-            qrs_width = calculate_qrs_width_ms(filtered_ecg, r_idx, fs)
-            
-            anomaly_type = "Ectopic Beat"
-            description = "Premature heartbeat detected."
-            
-            if qrs_width > 120.0:
-                anomaly_type = "PVC"
-                description = f"Premature Ventricular Contraction (Wide QRS: {qrs_width:.1f}ms)."
-            elif qrs_width < 100.0:
-                anomaly_type = "PAC"
-                description = f"Premature Atrial Contraction (Narrow QRS: {qrs_width:.1f}ms)."
+            if next_rr > 1.15 * curr_rr:
+                qrs_width = calculate_qrs_width_ms(filtered_ecg, r_idx, fs)
                 
-            anomalies.append({
-                "timestamp": float(r_times[i]),
-                "index": int(r_idx),
-                "type": anomaly_type,
-                "description": description,
-                "qrs_width_ms": qrs_width,
-                "rr_interval_ms": float(curr_rr),
-                "local_avg_rr_ms": float(local_avg_rr)
-            })
+                anomaly_type = "Ectopic Beat"
+                description = "Premature heartbeat detected."
+                
+                if qrs_width > 120.0:
+                    anomaly_type = "PVC"
+                    description = f"Premature Ventricular Contraction (Wide QRS: {qrs_width:.1f}ms) followed by compensatory pause."
+                elif qrs_width < 100.0:
+                    anomaly_type = "PAC"
+                    description = f"Premature Atrial Contraction (Narrow QRS: {qrs_width:.1f}ms) followed by incomplete pause."
+                    
+                anomalies.append({
+                    "timestamp": float(r_times[i]),
+                    "index": int(r_idx),
+                    "type": anomaly_type,
+                    "description": description,
+                    "qrs_width_ms": qrs_width,
+                    "rr_interval_ms": float(curr_rr),
+                    "local_avg_rr_ms": float(local_avg_rr)
+                })
             
         # 2. Anomaly: Long Pause (RR interval > 2.0 seconds or > 1.8x average)
+        # To eliminate false pauses from missed peaks, we verify that the ECG trace in the middle of
+        # the interval is actually flat and does not contain a missed QRS peak.
         elif curr_rr > max(2000.0, 1.8 * local_avg_rr):
-            anomalies.append({
-                "timestamp": float(r_times[i]),
-                "index": int(r_idx),
-                "type": "Pause",
-                "description": f"Extended pause of {curr_rr/1000.0:.2f}s detected.",
-                "qrs_width_ms": 0.0,
-                "rr_interval_ms": float(curr_rr),
-                "local_avg_rr_ms": float(local_avg_rr)
-            })
+            # Calculate segment inside the pause, excluding standard QRS width of surrounding beats
+            padding = int(0.12 * fs) # 120ms padding
+            start_sample = r_peaks[i-1] + padding
+            end_sample = r_peaks[i] - padding
+            
+            is_missed_peak = False
+            if start_sample < end_sample:
+                mid_segment = filtered_ecg[start_sample:end_sample]
+                if len(mid_segment) > 0:
+                    max_abs_val = np.max(np.abs(mid_segment))
+                    peak_amp = 0.5 * (abs(filtered_ecg[r_peaks[i-1]]) + abs(filtered_ecg[r_peaks[i]]))
+                    # If absolute voltage in the middle exceeds 30% of peak amplitude or 150uV, it's a missed peak!
+                    if max_abs_val > 0.3 * peak_amp or max_abs_val > 150.0:
+                        is_missed_peak = True
+            
+            if not is_missed_peak:
+                anomalies.append({
+                    "timestamp": float(r_times[i]),
+                    "index": int(r_idx),
+                    "type": "Pause",
+                    "description": f"Extended pause of {curr_rr/1000.0:.2f}s detected.",
+                    "qrs_width_ms": 0.0,
+                    "rr_interval_ms": float(curr_rr),
+                    "local_avg_rr_ms": float(local_avg_rr)
+                })
 
     # Calculate global Heart Rate Variability (HRV) metrics
     # RMSSD (Root Mean Square of Successive Differences)
