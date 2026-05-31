@@ -174,12 +174,24 @@ def align_timelines(garmin_records: List[Dict[str, Any]], ecg_timestamps: np.nda
     Computes clock lag (drift) between Garmin watch activity time and phone app (ECGLogger) time
     using cross-correlation of calculated Heart Rate profiles.
     
+    It automatically compensates for gross timezone discrepancies (e.g. UTC vs local time epoch shifts)
+    rounded to the nearest 30-minute interval before running fine cross-correlation.
+    
     Returns:
         float: The offset in milliseconds to ADD to the ECG timestamps.
     """
     if not garmin_records or len(ecg_r_peaks) < 30:
         return 0.0
         
+    # 0. Automatically compute and compensate for timezone differences (gross offset)
+    g_start_ms = garmin_records[0]['timestamp']
+    ecg_start_ms = ecg_timestamps[0]
+    gross_diff_ms = g_start_ms - ecg_start_ms
+    
+    # Round to the nearest 30 minutes to support fractional timezones like India Standard Time (IST)
+    half_hour_ms = 1800.0 * 1000.0
+    gross_offset_ms = round(gross_diff_ms / half_hour_ms) * half_hour_ms
+    
     # 1. Build second-by-second ECG Heart Rate profile
     ecg_r_times_sec = ecg_timestamps[ecg_r_peaks] / 1000.0 # convert to relative seconds
     r_diffs_ms = np.diff(ecg_timestamps[ecg_r_peaks])
@@ -198,8 +210,8 @@ def align_timelines(garmin_records: List[Dict[str, Any]], ecg_timestamps: np.nda
         
     ecg_hr_profile = np.interp(ecg_time_grid, ecg_r_times_sec, hr_at_peaks)
     
-    # 2. Build Garmin Heart Rate profile
-    g_times_sec = np.array([r['timestamp'] / 1000.0 for r in garmin_records])
+    # 2. Build Garmin Heart Rate profile, shifting temporarily to local ECG timezone using gross offset
+    g_times_sec = np.array([(r['timestamp'] - gross_offset_ms) / 1000.0 for r in garmin_records])
     g_hr = np.array([r['heart_rate'] for r in garmin_records])
     
     g_start_sec = int(np.floor(g_times_sec[0]))
@@ -207,11 +219,11 @@ def align_timelines(garmin_records: List[Dict[str, Any]], ecg_timestamps: np.nda
     g_time_grid = np.arange(g_start_sec, g_end_sec)
     
     if len(g_time_grid) < 10:
-        return 0.0
+        return float(gross_offset_ms) # Fallback to gross timezone shift if fine alignment profile is too short
         
     garmin_hr_profile = np.interp(g_time_grid, g_times_sec, g_hr)
     
-    # 3. Cross-Correlate to find best offset
+    # 3. Cross-Correlate to find best fine-grain lag
     # We will search lags from -30 seconds to +30 seconds
     max_lag = 30
     best_lag = 0
@@ -221,9 +233,9 @@ def align_timelines(garmin_records: List[Dict[str, Any]], ecg_timestamps: np.nda
     ecg_norm = ecg_hr_profile - np.mean(ecg_hr_profile)
     g_norm = garmin_hr_profile - np.mean(garmin_hr_profile)
     
-    # If standard deviations are zero, return 0 lag
+    # If standard deviations are zero, return gross timezone shift directly
     if np.std(ecg_norm) == 0 or np.std(g_norm) == 0:
-        return 0.0
+        return float(gross_offset_ms)
         
     for lag in range(-max_lag, max_lag + 1):
         # Shift Garmin profile relative to ECG profile
@@ -249,8 +261,7 @@ def align_timelines(garmin_records: List[Dict[str, Any]], ecg_timestamps: np.nda
             max_corr = corr
             best_lag = lag
             
-    # Calculate offset in milliseconds
-    # Garmin time = ECG time + lag
-    # So we must add lag * 1000.0 to ECG timestamps
-    offset_ms = best_lag * 1000.0
-    return float(offset_ms)
+    # Calculate total offset in milliseconds
+    # ECG aligned = ECG original + gross_offset + fine_lag
+    total_offset_ms = gross_offset_ms + (best_lag * 1000.0)
+    return float(total_offset_ms)

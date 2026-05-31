@@ -45,13 +45,15 @@ export const MacroTimeline: React.FC<MacroTimelineProps> = ({
   // Percentage utility for click mapping
   const getPercentage = (ts: number) => {
     if (totalDurationMs <= 0) return 0;
-    return ((ts - tMin) / totalDurationMs) * 100.0;
+    const pct = ((ts - tMin) / totalDurationMs) * 100.0;
+    return Math.max(0, Math.min(100.0, pct)); // Safety clamp against unaligned out-of-range timestamps
   };
 
   // SVG x-coordinate mapping (0 to 1000 px inside viewBox)
   const getSvgX = (ts: number) => {
     if (totalDurationMs <= 0) return 0;
-    return ((ts - tMin) / totalDurationMs) * 1000.0;
+    const x = ((ts - tMin) / totalDurationMs) * 1000.0;
+    return Math.max(0, Math.min(1000.0, x)); // Safety clamp against unaligned out-of-range timestamps
   };
 
   // Heart Rate Y mapping (BPM 40..200 mapped to 90..10px vertically inside 100px viewBox)
