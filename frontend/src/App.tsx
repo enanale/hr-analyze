@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Heart, Upload, AlertTriangle, Sparkles, TrendingUp, Check, Info, FileSpreadsheet, ShieldAlert, RefreshCw } from 'lucide-react';
+import { Heart, Upload, AlertTriangle, Sparkles, TrendingUp, Check, Info, FileSpreadsheet, ShieldAlert, RefreshCw, Save, FileJson } from 'lucide-react';
 import { OnboardingWizard } from './components/OnboardingWizard';
 import { EcgCanvas } from './components/EcgCanvas';
 import { MacroTimeline } from './components/MacroTimeline';
@@ -40,12 +40,17 @@ function App() {
   const [success, setSuccess] = useState<boolean>(false);
 
   // Garmin Connect Sync States
-  const [activeTab, setActiveTab] = useState<'manual' | 'garmin'>('manual');
+  const [activeTab, setActiveTab] = useState<'manual' | 'garmin' | 'snapshot'>('manual');
   const [isGarminConfigured, setIsGarminConfigured] = useState<boolean>(false);
   const [garminEmail, setGarminEmail] = useState<string | null>(null);
   const [garminActivities, setGarminActivities] = useState<any[]>([]);
   const [selectedGarminActivityId, setSelectedGarminActivityId] = useState<string>('');
   const [isFetchingActivities, setIsFetchingActivities] = useState<boolean>(false);
+
+  // Snapshot Load States
+  const [snapshotFile, setSnapshotFile] = useState<File | null>(null);
+  const [isDragOverSnapshot, setIsDragOverSnapshot] = useState<boolean>(false);
+  const snapshotInputRef = useRef<HTMLInputElement | null>(null);
 
   // Check Garmin configuration on mount
   useEffect(() => {
@@ -225,6 +230,115 @@ function App() {
       setGarminFile(e.dataTransfer.files[0]);
     }
   };
+  
+  // Read and load JSON snapshot client-side offline
+  const readAndLoadSnapshot = (file: File) => {
+    setIsLoading(true);
+    setError(null);
+    setSuccess(false);
+    setSnapshotFile(file);
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target?.result as string;
+        const data = JSON.parse(text);
+
+        // Schema integrity checks
+        if (!data.sampling_rate || data.duration_sec === undefined || !data.hrv_metrics || !data.anomalies) {
+          throw new Error("Missing critical analysis metrics in snapshot.");
+        }
+        if (!data.raw_ecg_full || !Array.isArray(data.raw_ecg_full.timestamps) || !Array.isArray(data.raw_ecg_full.values)) {
+          throw new Error("Missing high-frequency ECG waveform data.");
+        }
+
+        // Successfully validated, load data client-side!
+        loadSessionData(data);
+        setSuccess(true);
+      } catch (err: any) {
+        setError(`Failed to load snapshot: ${err.message || "Invalid JSON structure."}`);
+        setSnapshotFile(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    reader.onerror = () => {
+      setError("Failed to read snapshot file.");
+      setSnapshotFile(null);
+      setIsLoading(false);
+    };
+
+    reader.readAsText(file);
+  };
+
+  const handleDropSnapshot = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOverSnapshot(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      readAndLoadSnapshot(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleSnapshotFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      readAndLoadSnapshot(e.target.files[0]);
+    }
+  };
+
+  // Compile active React state and download snapshot as JSON file
+  const handleExportSnapshot = () => {
+    if (!success || ecgTimestamps.length === 0) return;
+
+    // Downsample series on the fly for macro view similar to backend factor decimation
+    const targetLen = 8000;
+    const n = ecgTimestamps.length;
+    let macroTs = ecgTimestamps;
+    let macroVal = ecgValues;
+    if (n > targetLen) {
+      const factor = Math.ceil(n / targetLen);
+      macroTs = [];
+      macroVal = [];
+      for (let i = 0; i < n; i += factor) {
+        macroTs.push(ecgTimestamps[i]);
+        macroVal.push(ecgValues[i]);
+      }
+    }
+
+    const snapshotData = {
+      success: true,
+      has_garmin: hasGarmin,
+      sync_offset_ms: syncOffsetMs,
+      sampling_rate: samplingRate,
+      total_samples: totalSamples,
+      duration_sec: durationSec,
+      hrv_metrics: hrvMetrics,
+      anomalies: anomalies,
+      macro_ecg: {
+        timestamps: macroTs,
+        values: macroVal
+      },
+      raw_ecg_full: {
+        timestamps: ecgTimestamps,
+        values: ecgValues
+      },
+      garmin_activity: garminActivity,
+      ecg_heart_rate: ecgHeartRate
+    };
+
+    const jsonString = JSON.stringify(snapshotData, null, 2);
+    const blob = new Blob([jsonString], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    
+    const link = document.createElement("a");
+    const dateStr = new Date().toISOString().slice(0, 10);
+    link.href = url;
+    link.download = `hr-analyze-snapshot-${dateStr}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="min-h-screen bg-[#080a0c] text-gray-100 flex flex-col font-sans">
@@ -264,7 +378,9 @@ function App() {
                 Upload Activity Session Records
               </h3>
               <p className="text-xs text-secondary mt-0.5">
-                Load your Polar H10 ECG logs and synchronize them with watch metrics.
+                {activeTab === 'snapshot' 
+                  ? "Load a previously exported JSON analysis snapshot to visualize telemetry offline immediately." 
+                  : "Load your Polar H10 ECG logs and synchronize them with watch metrics."}
               </p>
             </div>
 
@@ -298,164 +414,219 @@ function App() {
                 <TrendingUp size={12} />
                 Garmin Connect Sync
               </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('snapshot')}
+                className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all flex items-center gap-1 ${
+                  activeTab === 'snapshot' 
+                    ? 'bg-[#ffffff] text-[#1a73e8] shadow-sm font-bold' 
+                    : 'text-[#5f6368] hover:text-[#202124]'
+                }`}
+              >
+                <FileJson size={12} />
+                Load Snapshot
+              </button>
             </div>
           </div>
 
           <form onSubmit={handleUploadSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Polar File Box (Required for both tabs) */}
-              <div className="flex flex-col">
+            {activeTab === 'snapshot' ? (
+              /* Snapshot Single Full-Width Container */
+              <div className="flex flex-col animate-fadeIn">
                 <span className="text-[10px] font-bold text-secondary font-mono tracking-wider mb-2 block">
-                  POLAR CHEST STRAP DATA (REQUIRED)
+                  OFFLINE ANALYSIS SNAPSHOT (REQUIRED)
                 </span>
                 <div
-                  onDragOver={(e) => { e.preventDefault(); setIsDragOverEcg(true); }}
-                  onDragLeave={() => setIsDragOverEcg(false)}
-                  onDrop={handleDropEcg}
-                  onClick={() => ecgInputRef.current?.click()}
+                  onDragOver={(e) => { e.preventDefault(); setIsDragOverSnapshot(true); }}
+                  onDragLeave={() => setIsDragOverSnapshot(false)}
+                  onDrop={handleDropSnapshot}
+                  onClick={() => snapshotInputRef.current?.click()}
                   className={`border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-300 h-[220px] ${
-                    isDragOverEcg 
+                    isDragOverSnapshot 
                       ? 'border-[#1a73e8] bg-[#1a73e8]/[0.02]' 
-                      : ecgFile 
+                      : snapshotFile 
                         ? 'border-[#137333]/40 bg-[#137333]/[0.01]' 
                         : 'border-[#dadce0] hover:border-[#80868b] bg-[#ffffff]'
                   }`}
                 >
                   <input
                     type="file"
-                    ref={ecgInputRef}
-                    onChange={(e) => e.target.files && setEcgFile(e.target.files[0])}
-                    accept=".csv"
+                    ref={snapshotInputRef}
+                    onChange={handleSnapshotFileChange}
+                    accept=".json"
                     className="hidden"
                   />
-                  <FileSpreadsheet size={32} className={ecgFile ? 'text-[#137333]' : 'text-secondary'} />
+                  <FileJson size={32} className={snapshotFile ? 'text-[#137333]' : 'text-secondary'} />
                   <span className="text-sm font-semibold text-[#202124] mt-3">
-                    {ecgFile ? ecgFile.name : "Polar ECG Log (.csv)"}
+                    {snapshotFile ? snapshotFile.name : "Analysis Snapshot File (.json)"}
                   </span>
-                  <span className="text-xs text-secondary mt-1 max-w-[200px]">
-                    {ecgFile ? `${(ecgFile.size / 1024 / 1024).toFixed(2)} MB` : "Drag and drop raw 130Hz ECG CSV from ECGLogger here"}
+                  <span className="text-xs text-secondary mt-1 max-w-[400px]">
+                    {snapshotFile ? `${(snapshotFile.size / 1024).toFixed(1)} KB` : "Drag and drop your exported HR-Analyze analysis snapshot JSON here"}
                   </span>
-                  {ecgFile && (
+                  {snapshotFile && (
                     <span className="flex items-center gap-1 text-[10px] text-[#137333] font-semibold bg-[#e6f4ea] border border-[#137333]/15 px-2.5 py-0.5 rounded-full mt-3 animate-fadeIn">
-                      <Check size={10} /> Selected
+                      <Check size={10} /> Loaded Offline
                     </span>
                   )}
                 </div>
               </div>
-
-              {/* Tab Content Panel */}
-              {activeTab === 'manual' ? (
+            ) : (
+              /* Two Column layout for Manual/Garmin Sync */
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Polar File Box (Required for both tabs) */}
                 <div className="flex flex-col">
                   <span className="text-[10px] font-bold text-secondary font-mono tracking-wider mb-2 block">
-                    GARMIN SMARTWATCH DATA (OPTIONAL)
+                    POLAR CHEST STRAP DATA (REQUIRED)
                   </span>
                   <div
-                    onDragOver={(e) => { e.preventDefault(); setIsDragOverGarmin(true); }}
-                    onDragLeave={() => setIsDragOverGarmin(false)}
-                    onDrop={handleDropGarmin}
-                    onClick={() => garminInputRef.current?.click()}
+                    onDragOver={(e) => { e.preventDefault(); setIsDragOverEcg(true); }}
+                    onDragLeave={() => setIsDragOverEcg(false)}
+                    onDrop={handleDropEcg}
+                    onClick={() => ecgInputRef.current?.click()}
                     className={`border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-300 h-[220px] ${
-                      isDragOverGarmin 
+                      isDragOverEcg 
                         ? 'border-[#1a73e8] bg-[#1a73e8]/[0.02]' 
-                        : garminFile 
+                        : ecgFile 
                           ? 'border-[#137333]/40 bg-[#137333]/[0.01]' 
                           : 'border-[#dadce0] hover:border-[#80868b] bg-[#ffffff]'
                     }`}
                   >
                     <input
                       type="file"
-                      ref={garminInputRef}
-                      onChange={(e) => e.target.files && setGarminFile(e.target.files[0])}
-                      accept=".fit"
+                      ref={ecgInputRef}
+                      onChange={(e) => e.target.files && setEcgFile(e.target.files[0])}
+                      accept=".csv"
                       className="hidden"
                     />
-                    <TrendingUp size={32} className={garminFile ? 'text-[#137333]' : 'text-secondary'} />
+                    <FileSpreadsheet size={32} className={ecgFile ? 'text-[#137333]' : 'text-secondary'} />
                     <span className="text-sm font-semibold text-[#202124] mt-3">
-                      {garminFile ? garminFile.name : "Garmin Activity File (.fit)"}
+                      {ecgFile ? ecgFile.name : "Polar ECG Log (.csv)"}
                     </span>
                     <span className="text-xs text-secondary mt-1 max-w-[200px]">
-                      {garminFile ? `${(garminFile.size / 1024).toFixed(1)} KB` : "Drag and drop watch binary FIT activity file"}
+                      {ecgFile ? `${(ecgFile.size / 1024 / 1024).toFixed(2)} MB` : "Drag and drop raw 130Hz ECG CSV from ECGLogger here"}
                     </span>
-                    {garminFile && (
+                    {ecgFile && (
                       <span className="flex items-center gap-1 text-[10px] text-[#137333] font-semibold bg-[#e6f4ea] border border-[#137333]/15 px-2.5 py-0.5 rounded-full mt-3 animate-fadeIn">
                         <Check size={10} /> Selected
                       </span>
                     )}
                   </div>
                 </div>
-              ) : (
-                <div className="flex flex-col">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-[10px] font-bold text-secondary font-mono tracking-wider">
-                      GARMIN CONNECT AUTO-SYNC
+
+                {/* Tab Content Panel */}
+                {activeTab === 'manual' ? (
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-bold text-secondary font-mono tracking-wider mb-2 block">
+                      GARMIN SMARTWATCH DATA (OPTIONAL)
                     </span>
-                    {isGarminConfigured && (
-                      <span className="flex items-center text-[10px] text-[#137333] bg-[#e6f4ea] px-2.5 py-0.5 rounded-full font-sans font-medium border border-[#137333]/10">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#137333] inline-block mr-1" />
-                        Configured: {garminEmail}
+                    <div
+                      onDragOver={(e) => { e.preventDefault(); setIsDragOverGarmin(true); }}
+                      onDragLeave={() => setIsDragOverGarmin(false)}
+                      onDrop={handleDropGarmin}
+                      onClick={() => garminInputRef.current?.click()}
+                      className={`border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-300 h-[220px] ${
+                        isDragOverGarmin 
+                          ? 'border-[#1a73e8] bg-[#1a73e8]/[0.02]' 
+                          : garminFile 
+                            ? 'border-[#137333]/40 bg-[#137333]/[0.01]' 
+                            : 'border-[#dadce0] hover:border-[#80868b] bg-[#ffffff]'
+                      }`}
+                    >
+                      <input
+                        type="file"
+                        ref={garminInputRef}
+                        onChange={(e) => e.target.files && setGarminFile(e.target.files[0])}
+                        accept=".fit"
+                        className="hidden"
+                      />
+                      <TrendingUp size={32} className={garminFile ? 'text-[#137333]' : 'text-secondary'} />
+                      <span className="text-sm font-semibold text-[#202124] mt-3">
+                        {garminFile ? garminFile.name : "Garmin Activity File (.fit)"}
                       </span>
+                      <span className="text-xs text-secondary mt-1 max-w-[200px]">
+                        {garminFile ? `${(garminFile.size / 1024).toFixed(1)} KB` : "Drag and drop watch binary FIT activity file"}
+                      </span>
+                      {garminFile && (
+                        <span className="flex items-center gap-1 text-[10px] text-[#137333] font-semibold bg-[#e6f4ea] border border-[#137333]/15 px-2.5 py-0.5 rounded-full mt-3 animate-fadeIn">
+                          <Check size={10} /> Selected
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-[10px] font-bold text-secondary font-mono tracking-wider">
+                        GARMIN CONNECT AUTO-SYNC
+                      </span>
+                      {isGarminConfigured && (
+                        <span className="flex items-center text-[10px] text-[#137333] bg-[#e6f4ea] px-2.5 py-0.5 rounded-full font-sans font-medium border border-[#137333]/10">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#137333] inline-block mr-1" />
+                          Configured: {garminEmail}
+                        </span>
+                      )}
+                    </div>
+                    
+                    {isGarminConfigured ? (
+                      <div className="bg-[#ffffff] border border-[#dadce0] rounded-2xl p-5 flex flex-col justify-center h-[220px]">
+                        <div>
+                          <label className="text-xs text-secondary font-semibold mb-2 block">
+                            Select Recent Activity to Synchronize:
+                          </label>
+                          {isFetchingActivities ? (
+                            <div className="flex flex-col items-center justify-center gap-2 py-4 text-xs text-secondary font-mono">
+                              <RefreshCw size={18} className="animate-spin text-[#1a73e8]" />
+                              <span>Connecting to Garmin Connect...</span>
+                            </div>
+                          ) : garminActivities.length === 0 ? (
+                            <div className="text-center py-4 text-xs text-secondary bg-[#f8f9fa] border border-[#dadce0]/50 rounded-xl">
+                              <span>No recent activities found or failed to load.</span>
+                              <button 
+                                type="button" 
+                                onClick={fetchActivities}
+                                className="text-[#1a73e8] font-bold block mx-auto mt-2 hover:bg-[#e8f0fe] active:scale-95 transition-all text-[10px] px-3 py-1 rounded-full bg-[#e8f0fe]/60 border-none"
+                              >
+                                Retry Connection
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="relative">
+                              <select
+                                value={selectedGarminActivityId}
+                                onChange={(e) => setSelectedGarminActivityId(e.target.value)}
+                                className="w-full bg-[#f8f9fa] border border-[#dadce0] rounded-xl px-3 py-2.5 text-xs text-[#202124] focus:outline-none focus:border-[#1a73e8] transition-all font-mono"
+                              >
+                                {garminActivities.map((act) => {
+                                  const dateStr = new Date(act.startTimeLocal).toLocaleDateString(undefined, { 
+                                    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 
+                                  });
+                                  const minDuration = Math.round(act.duration_sec / 60);
+                                  const kmDistance = (act.distance_m / 1000).toFixed(2);
+                                  
+                                  return (
+                                    <option key={act.activityId} value={act.activityId}>
+                                      {act.activityName} ({act.activityType}) — {dateStr} — {minDuration} min ({kmDistance} km)
+                                    </option>
+                                  );
+                                })}
+                              </select>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="border border-[#e37400]/20 bg-[#fef7e0] rounded-2xl p-5 flex flex-col justify-center items-center text-center h-[220px]">
+                        <AlertTriangle size={28} className="text-[#e37400] mb-2" />
+                        <span className="text-sm font-semibold text-[#202124]">Auto-Sync Not Configured</span>
+                        <span className="text-xs text-secondary mt-1.5 max-w-[280px] leading-relaxed">
+                          Garmin Connect credentials are missing. Please enter your email and password inside the local <code>backend/.env</code> file and restart the API server.
+                        </span>
+                      </div>
                     )}
                   </div>
-                  
-                  {isGarminConfigured ? (
-                    <div className="bg-[#ffffff] border border-[#dadce0] rounded-2xl p-5 flex flex-col justify-center h-[220px]">
-                      <div>
-                        <label className="text-xs text-secondary font-semibold mb-2 block">
-                          Select Recent Activity to Synchronize:
-                        </label>
-                        {isFetchingActivities ? (
-                          <div className="flex flex-col items-center justify-center gap-2 py-4 text-xs text-secondary font-mono">
-                            <RefreshCw size={18} className="animate-spin text-[#1a73e8]" />
-                            <span>Connecting to Garmin Connect...</span>
-                          </div>
-                        ) : garminActivities.length === 0 ? (
-                          <div className="text-center py-4 text-xs text-secondary bg-[#f8f9fa] border border-[#dadce0]/50 rounded-xl">
-                            <span>No recent activities found or failed to load.</span>
-                            <button 
-                              type="button" 
-                              onClick={fetchActivities}
-                              className="text-[#1a73e8] font-bold block mx-auto mt-2 hover:bg-[#e8f0fe] active:scale-95 transition-all text-[10px] px-3 py-1 rounded-full bg-[#e8f0fe]/60 border-none"
-                            >
-                              Retry Connection
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="relative">
-                            <select
-                              value={selectedGarminActivityId}
-                              onChange={(e) => setSelectedGarminActivityId(e.target.value)}
-                              className="w-full bg-[#f8f9fa] border border-[#dadce0] rounded-xl px-3 py-2.5 text-xs text-[#202124] focus:outline-none focus:border-[#1a73e8] transition-all font-mono"
-                            >
-                              {garminActivities.map((act) => {
-                                const dateStr = new Date(act.startTimeLocal).toLocaleDateString(undefined, { 
-                                  month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 
-                                });
-                                const minDuration = Math.round(act.duration_sec / 60);
-                                const kmDistance = (act.distance_m / 1000).toFixed(2);
-                                
-                                return (
-                                  <option key={act.activityId} value={act.activityId}>
-                                    {act.activityName} ({act.activityType}) — {dateStr} — {minDuration} min ({kmDistance} km)
-                                  </option>
-                                );
-                              })}
-                            </select>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="border border-[#e37400]/20 bg-[#fef7e0] rounded-2xl p-5 flex flex-col justify-center items-center text-center h-[220px]">
-                      <AlertTriangle size={28} className="text-[#e37400] mb-2" />
-                      <span className="text-sm font-semibold text-[#202124]">Auto-Sync Not Configured</span>
-                      <span className="text-xs text-secondary mt-1.5 max-w-[280px] leading-relaxed">
-                        Garmin Connect credentials are missing. Please enter your email and password inside the local <code>backend/.env</code> file and restart the API server.
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
 
             {/* Info callout banner spanning full width */}
             {activeTab === 'garmin' && isGarminConfigured && (
@@ -469,29 +640,31 @@ function App() {
 
             {/* Error Indicators */}
             {error && (
-              <div className="flex gap-2 items-center p-3 rounded-lg border border-red-500/20 bg-red-500/10 text-red-400 text-xs font-semibold">
+              <div className="flex gap-2 items-center p-3 rounded-lg border border-red-500/20 bg-red-500/10 text-red-400 text-xs font-semibold animate-fadeIn">
                 <AlertTriangle size={16} />
                 <span>{error}</span>
               </div>
             )}
 
-            {/* Submit Bar */}
-            <div className="flex justify-end pt-5 mt-8 border-t border-black/[0.05]">
-              <button
-                type="submit"
-                disabled={isLoading || !ecgFile || (activeTab === 'garmin' && (!isGarminConfigured || isFetchingActivities || !selectedGarminActivityId))}
-                className="px-8 py-3 bg-gradient-to-r from-[#00f2fe] to-[#4facfe] text-[#080a0c] font-bold rounded-full hover:opacity-95 disabled:opacity-40 transition-all text-sm flex items-center gap-2"
-              >
-                {isLoading ? (
-                  <>
-                    <RefreshCw size={16} className="animate-spin" />
-                    Analyzing...
-                  </>
-                ) : (
-                  "Analyze Session"
-                )}
-              </button>
-            </div>
+            {/* Submit Bar (Only shown for Manual File / Garmin Cloud Sync) */}
+            {activeTab !== 'snapshot' && (
+              <div className="flex justify-end pt-5 mt-8 border-t border-black/[0.05]">
+                <button
+                  type="submit"
+                  disabled={isLoading || !ecgFile || (activeTab === 'garmin' && (!isGarminConfigured || isFetchingActivities || !selectedGarminActivityId))}
+                  className="px-8 py-3 bg-gradient-to-r from-[#00f2fe] to-[#4facfe] text-[#080a0c] font-bold rounded-full hover:opacity-95 disabled:opacity-40 transition-all text-sm flex items-center gap-2"
+                >
+                  {isLoading ? (
+                    <>
+                      <RefreshCw size={16} className="animate-spin" />
+                      Analyzing...
+                    </>
+                  ) : (
+                    "Analyze Session"
+                  )}
+                </button>
+              </div>
+            )}
           </form>
         </div>
 
@@ -567,9 +740,19 @@ function App() {
 
             {/* Session Metadata Bar */}
             <div className="flex flex-wrap gap-4 justify-between items-center bg-white/[0.02] border border-white/5 px-4 py-2.5 rounded-xl text-xs text-secondary font-mono">
-              <span className="flex items-center gap-1.5"><Info size={13} className="text-cyan-400" /> Sampling Rate: <span className="text-white font-bold">{samplingRate} Hz</span></span>
-              <span>Duration: <span className="text-white font-bold">{Math.round(durationSec)} seconds</span></span>
-              <span>Total Telemetry Samples: <span className="text-white font-bold">{totalSamples.toLocaleString()} points</span></span>
+              <div className="flex flex-wrap gap-4 items-center">
+                <span className="flex items-center gap-1.5"><Info size={13} className="text-cyan-400" /> Sampling Rate: <span className="text-white font-bold">{samplingRate} Hz</span></span>
+                <span>Duration: <span className="text-white font-bold">{Math.round(durationSec)} seconds</span></span>
+                <span>Total Telemetry Samples: <span className="text-white font-bold">{totalSamples.toLocaleString()} points</span></span>
+              </div>
+              <button
+                type="button"
+                onClick={handleExportSnapshot}
+                className="px-4 py-1.5 bg-[#1a73e8] text-white font-semibold rounded-full hover:bg-[#174ea6] active:scale-95 transition-all text-[11px] flex items-center gap-1.5 border-none cursor-pointer shadow-sm"
+              >
+                <Save size={12} />
+                Export Snapshot
+              </button>
             </div>
 
             {/* Sync metrics strip if Garmin sync occurred */}
