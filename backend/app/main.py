@@ -166,8 +166,8 @@ async def analyze_activity(
                 "values": macro_val
             },
             "raw_ecg_full": {
-                "timestamps": timestamps.tolist() if len(timestamps) < 50000 else [],
-                "values": filtered_ecg.tolist() if len(timestamps) < 50000 else []
+                "timestamps": timestamps.tolist(),
+                "values": filtered_ecg.tolist()
             },
             "garmin_activity": garmin_data["records"] if has_garmin else None,
             "ecg_heart_rate": ecg_hr_curve
