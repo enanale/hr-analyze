@@ -62,11 +62,11 @@ def parse_polar_csv(file_bytes: bytes) -> Dict[str, Any]:
         raise ValueError("ECG file contains insufficient data points.")
 
     # Auto-detect if unit is millivolts (mV) instead of microvolts (uV).
-    # Typically uV values have absolute max > 10.0 (typically 500-2000).
-    # mV values have absolute max < 10.0 (typically 0.1 - 2.0).
+    # We use the 99th percentile of absolute values to be robust against isolated artifact spikes
+    # (e.g., motion glitches or sensor placement static spikes that exceed 10.0 mV).
     if len(ecg_uV) > 0:
-        max_abs_val = np.max(np.abs(ecg_uV))
-        if max_abs_val < 10.0:
+        percentile_99 = np.percentile(np.abs(ecg_uV), 99)
+        if percentile_99 < 10.0:
             ecg_uV = ecg_uV * 1000.0
 
     # Convert timestamps to milliseconds if they appear to be in nanoseconds
